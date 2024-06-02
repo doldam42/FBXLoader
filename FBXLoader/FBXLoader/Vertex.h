@@ -19,12 +19,6 @@ struct SkinnedVertex {
 	uint8_t boneIndices[4] = { 0, 0, 0, 0 };
 };
 
-struct FaceGroup {
-	uint32_t* pIndices;
-	UINT numTriangles;
-	std::wstring diffuseMapName;
-};
-
 struct Keyframe
 {
 	uint32_t frameNum;
@@ -41,8 +35,7 @@ struct Joint
 
 struct Skeleton
 {
-	Joint* pJoints;
-	uint32_t numJoints;
+	std::vector<Joint> joints;
 };
 
 struct AnimationClip {
@@ -54,3 +47,12 @@ struct AnimationClip {
 
 Keyframe* CreateKeyFrames(uint32_t numFrame);
 void DeleteKeyFrames(Keyframe* pkeys);
+
+struct Material {
+	Vector3 ambient = Vector3(0.1f);  // 12
+	float   shininess = 1.0f;         // 4
+	Vector3 diffuse = Vector3(0.5f);  // 12
+	float   dummy1;                   // 4
+	Vector3 specular = Vector3(0.5f); // 12
+	float   dummy2;                   // 4
+};

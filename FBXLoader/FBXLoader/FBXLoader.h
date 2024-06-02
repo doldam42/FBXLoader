@@ -1,26 +1,43 @@
-#pragma once
+#include <fbxsdk.h>
+#include <string>
+#include <vector>
+#include <unordered_map>
 
-#include "fbxsdk.h"
+#include "GameUtils.h"
 #include "Vertex.h"
 
-// 조건1. skeleton의 bone 개수와 AnimationClips의 Bone 개수는 동일하다.
-class FBXLoader
-{
-	FbxManager* m_manager;
-	FbxScene* m_scene;
-	std::wstring m_basePath;
-	bool m_hasAnimation;
+using namespace std;
 
-	uint32_t m_numVertices;
-	BasicVertex* m_pBasicVertices;
-	SkinnedVertex* m_pSkinnedVertices;
+class FBXLoader {
+	FbxManager* m_pManager = nullptr;
+	FbxScene* m_pScene = nullptr;
+	FbxGeometryConverter* m_pGeoConverter = nullptr;
 
-	uint32_t m_numFaces;
-	FaceGroup* m_Faces;
+	Skeleton* m_pSkeleton = nullptr;
+	wstring m_basePath;
 
-	Skeleton m_skeleton;
+	unordered_map<unsigned int, Material*> m_materialMap;
 
-	uint32_t m_numAnimations;
-	AnimationClip* m_pAnimations;
+private:
+	void LoadScene(const wchar_t* basePath, const wchar_t* filename);
+	void ProcessScene();
+	void ProcessNode(FbxNode* pNode, FbxNodeAttribute::EType attribute);
+	void ProcessMesh(FbxNode* pNode);
+	void ProcessMaterial();
+	void ProcessMaterialAttribute(FbxSurfaceMaterial* inMaterial, unsigned int inMaterialIndex);
+	void ProcessMaterialTexture(FbxSurfaceMaterial* inMaterial);
+	void ProcessAnimations();
+	void ProcessAnimation(FbxNode* pNode, wstring takeName, float frameRate, float start, float end);
+	void ProcessSkeleton(FbxNode* pNode);
+
+	void ProcessBoneWeights(FbxMesh* pMesh);
+	void ProcessBoneWeights(FbxSkin* pSkin);
+
+	void Cleanup();
+public:
+	void Initialize();
+	void Load(const wchar_t* basePath, const wchar_t* filename);
+
+	FBXLoader() = default;
+	~FBXLoader();
 };
-
