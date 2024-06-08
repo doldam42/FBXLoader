@@ -50,6 +50,7 @@ void FBXLoader::ProcessNode(FbxNode *inNode, Matrix tr, FbxNodeAttribute::EType 
             ProcessMesh(inNode);
             break;
         case FbxNodeAttribute::eSkeleton:
+
             break;
         }
     }
@@ -151,36 +152,66 @@ void FBXLoader::ProcessJointsAndAnimations(MeshData *outMesh, FbxNode *inNode)
             FbxTakeInfo *takeInfo = m_pScene->GetTakeInfo(animStackName);
             FbxTime      start = takeInfo->mLocalTimeSpan.GetStart();
             FbxTime      end = takeInfo->mLocalTimeSpan.GetStop();
-            uint32_t   frameCount = end.GetFrameCount(FbxTime::eFrames24) - start.GetFrameCount(FbxTime::eFrames24) + 1;
-            Keyframe **currAnim = &m_skeleton.joints[currJointIndex];
+            uint32_t frameCount = end.GetFrameCount(FbxTime::eFrames24) - start.GetFrameCount(FbxTime::eFrames24) + 1;
+
+            Keyframe *currAnim = CreateKeyFrames(frameCount);
 
             for (FbxLongLong i = start.GetFrameCount(FbxTime::eFrames24); i <= end.GetFrameCount(FbxTime::eFrames24);
                  ++i)
             {
                 FbxTime currTime;
                 currTime.SetFrame(i, FbxTime::eFrames24);
-                *currAnim = new Keyframe();
-                (*currAnim)->mFrameNum = i;
+                currAnim->frameNum = i;
                 FbxAMatrix currentTransformOffset = inNode->EvaluateGlobalTransform(currTime) * geometryTransform;
-                (*currAnim)->mGlobalTransform =
-                    currentTransformOffset.Inverse() * currCluster->GetLink()->EvaluateGlobalTransform(currTime);
-                currAnim = &((*currAnim)->mNext);
+                currAnim->globalTransform = toMatrix(currentTransformOffset.Inverse() *
+                                                     currCluster->GetLink()->EvaluateGlobalTransform(currTime));
+                currAnim = currAnim->pNext;
             }
+            m_animation.ppKeys[currJointIndex] = currAnim;
         }
     }
 
-    // Some of the control points only have less than 4 joints
-    // affecting them.
-    // For a normal renderer, there are usually 4 joints
-    // I am adding more dummy joints if there isn't enough
-    BlendingIndexWeightPair currBlendingIndexWeightPair;
-    currBlendingIndexWeightPair.mBlendingIndex = 0;
-    currBlendingIndexWeightPair.mBlendingWeight = 0;
-    for (auto itr = mControlPoints.begin(); itr != mControlPoints.end(); ++itr)
+
+    int argSortedIndices[16];
+    for (int vertexIdx = 0; vertexIdx < outMesh->numVertices; vertexIdx++)
     {
-        for (unsigned int i = itr->second->mBlendingInfo.size(); i <= 4; ++i)
+        /*outMesh->pSkinnedVertices[vertexIdx].blendWeights = ;
+        outMesh->pSkinnedVertices[vertexIdx].boneIndices = ;*/
+        // 만약 본 가중치 개수가 4개보다 크면 4개로 고정한다.
+        // 정렬해서 가장 작은 Weight를 가진
+        // 귀찮은데 버블 정렬 해버려? 어쩌피 4개 이한데...
+        int numIndices = boneWeights[vertexIdx].size();
+        SkinnedVertex &vertex = outMesh->pSkinnedVertices[vertexIdx];
+        
+        for (int i = 0; i < 16; i++)
         {
-            itr->second->mBlendingInfo.push_back(currBlendingIndexWeightPair);
+            argSortedIndices[i] = i;
+        }
+
+        if (numIndices > 4)
+        {
+            std::vector<float> &v = boneWeights[vertexIdx];
+            std::sort(argSortedIndices, argSortedIndices + numIndices,
+                      [&v](size_t i1, size_t i2) { return v[i1] > v[i2]; });
+
+            for (int i = 0; i < 4; i++)
+            {
+                vertex.blendWeights[i] = v[argSortedIndices[i]];
+                vertex.boneIndices[i] = boneIndices[vertexIdx][argSortedIndices[i]];
+            }
+            for (int i = 4; i < numIndices; i++)
+            {
+                vertex.blendWeights[0] += v[argSortedIndices[i]];
+            }
+
+        }
+        else
+        {
+            for (int i = 0; i < numIndices; i++)
+            {
+                vertex.blendWeights[i] = boneWeights[vertexIdx][i];
+                vertex.boneIndices[i] = boneIndices[vertexIdx][i];
+            }
         }
     }
 }
@@ -258,7 +289,11 @@ void FBXLoader::Load(const wchar_t *basePath, const wchar_t *filename)
         m_isSkinned = false;
     }
 
-    ProcessNode(m_pScene->GetRootNode(), Matrix(), FbxNodeAttribute::eSkeleton);
+    if (m_isSkinned)
+    {
+        m_animation.ppKeys = new Keyframe *[m_skeleton.joints.size()];
+    }
+
     ProcessNode(m_pScene->GetRootNode(), Matrix(), FbxNodeAttribute::eMesh);
 
     fbxImporter->Destroy();
