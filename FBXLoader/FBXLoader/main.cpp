@@ -5,6 +5,11 @@
 
 int main(void) {
 	FBXLoader loader;
+    loader.Initialize();
+
+	loader.Load(L"C:/workspace/repos/Assets/Models/zeldaPosed001/", L"zeldaPosed001.fbx");
+
+	MeshData *pMesh = loader.m_meshes[0];
 
 	return 0;
 }

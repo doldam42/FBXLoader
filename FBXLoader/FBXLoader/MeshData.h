@@ -4,7 +4,9 @@
 struct FACE_GROUP {
 	uint32_t* pIndices; // numTriangles * 3
 	uint32_t  numTriangles;
-	std::wstring diffuseMapName;
+
+	Material    material;
+	std::wstring diffuseTextureName;
 };
 
 struct MeshData {
